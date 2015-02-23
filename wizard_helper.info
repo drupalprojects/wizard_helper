@@ -1,7 +1,6 @@
-; $Id$
 name = CTools Wizard Helper
 description = A module to assist in creating CTools wizards.
 dependencies[] = ctools
 package = "CTools Helpers"
 version = "0.2.0"
-core= 6.x
+core= 7.x
