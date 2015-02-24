@@ -30,31 +30,35 @@ function wizard_helper_info() {
         foreach ($result as $path => &$wizard) {
           $wizard['module'] = $module;
           $wizard['path'] = $path;
+          $wizard['steps'] = isset($wizard['steps']) ? $wizard['steps'] : array();
+          $wizard['step_ids'] = isset($wizard['step_ids']) ? $wizard['step_ids'] : array();
           $wizard['id'] = isset($wizard['id']) ? $wizard['id'] : str_replace('/', '_', $path);
-          $wizard['pages'] = isset($wizard['pages']) ? $wizard['pages'] : array();
-          $wizard['title'] = isset($wizard['title']) ? $wizard['title'] : '';
-          $wizard['access callback'] = isset($wizard['access callback']) ? $wizard['access callback'] : 'user_access';
-          $wizard['access arguments'] = isset($wizard['access arguments']) ? $wizard['access arguments'] : array('access content');
-          $wizard['title'] = isset($wizard['title']) ? $wizard['title'] : '';
-          $wizard['wizard_path'] = isset($wizard['wizard_path']) ? $wizard['wizard_path'] : drupal_get_path('module', $module) . '/' . $wizard['id'];
           $wizard['form id'] = isset($wizard['form id']) ? $wizard['form id'] : $wizard['module'] . '_' . $wizard['id'];
           $wizard['object name'] = isset($wizard['object name']) ? $wizard['object name'] : $wizard['form id'];
-          $wizard['context id'] = 0;
-          $wizard['pageids'] = isset($wizard['pageids']) ? $wizard['pageids'] : array();
+          $wizard['title'] = isset($wizard['title']) ? $wizard['title'] : '';
+          $wizard['theme'] = isset($wizard['theme']) ? $wizard['theme'] : 'wizard_helper_page';
+          $wizard['wizard callback'] = isset($wizard['wizard callback']) ? $wizard['wizard callback'] : NULL;
+          $wizard['access callback'] = isset($wizard['access callback']) ? $wizard['access callback'] : 'user_access';
+          $wizard['access arguments'] = isset($wizard['access arguments']) ? $wizard['access arguments'] : array('access content');
           $wizard['cancel path'] = isset($wizard['cancel path']) ? $wizard['cancel path'] : $path;
           $wizard['return path'] = isset($wizard['return path']) ? $wizard['return path'] : $path;
+          $wizard['wizard path'] = isset($wizard['wizard path']) ? $wizard['wizard path'] : drupal_get_path('module', $module) . '/' . $wizard['id'];
+          $wizard['complete path'] = isset($wizard['complete path']) ? $wizard['complete path'] : $path;
+          $wizard['cache type'] = isset($wizard['cache type']) ? $wizard['cache type'] : 'session';
+          $wizard['context id'] = 0;
 
           // Iterate though the pages and assign page ids.
-          if (!empty($wizard['pages'])) {
-            foreach ($wizard['pages'] as $page => $title) {
-              if (!isset($wizard['pageids'][$page])) {
-                $wizard['pageids'][$page] = $wizard['form id'] . '_' . $page;
+          if (!empty($wizard['steps'])) {
+            foreach ($wizard['steps'] as $step => $title) {
+              if (!isset($wizard['step_ids'][$step])) {
+                $wizard['step_ids'][$step] = $wizard['form id'] . '_' . $step;
               }
             }
           }
 
-          // The start page.
-          $wizard['start'] = reset($wizard['pages']);
+          reset($wizard['steps']);
+          // This key is our starting step.
+          $wizard['start'] =  key($wizard['steps']);
         }
         $info = array_merge($info, $result);
       }
@@ -104,15 +108,15 @@ function wizard_helper_theme() {
   foreach ($info as $path => $wizard) {
 
     // Get all the wizard helper page ids.
-    foreach ($wizard['pageids'] as $page => $id) {
+    foreach ($wizard['step_ids'] as $step_id => $id) {
 
       // Add the template if the file exists.
-      if (file_exists(getcwd() . '/' . $wizard['wizard_path'] . '/' . $id . '.tpl.php')) {
+      if (file_exists(getcwd() . '/' . $wizard['wizard path'] . '/' . $id . '.tpl.php')) {
 
         // Add the template.
         $themes[$id] = array(
           'template'  => $id,
-          'path' => $wizard['wizard_path'],
+          'path' => $wizard['wizard path'],
           'arguments' => array('form' => NULL)
         );
       }
@@ -132,8 +136,8 @@ function wizard_helper_theme() {
  *   The full name of the form file to include.
  */
 function wizard_helper_include_form($wizard, $form_id) {
-  if (in_array($form_id, $wizard['pageids'])) {
-    $file = getcwd() . '/' . $wizard['wizard_path'] . '/' . $form_id . '.inc';
+  if (in_array($form_id, $wizard['step_ids'])) {
+    $file = getcwd() . '/' . $wizard['wizard path'] . '/' . $form_id . '.inc';
     if (file_exists($file)) {
       require_once $file;
     }
@@ -147,7 +151,7 @@ function wizard_helper_forms($form_id, $args) {
   $forms = array();
   $info = wizard_helper_info();
   foreach ($info as $path => $wizard) {
-    foreach ($wizard['pageids'] as $page => $id) {
+    foreach ($wizard['step_ids'] as $step_id => $id) {
       $forms[$id] = array(
         'callback' => 'wizard_helper_page_form',
         'callback arguments' => array($form_id, $args)
@@ -205,23 +209,23 @@ function wizard_helper_form($wizard, $step, $js, $form_state = array()) {
     'ajax' => $js
   ), $form_state);
 
-  // Set the pages.
-  $pages = $wizard['pages'];
+  // Set the steps.
+  $steps = $wizard['steps'];
 
-  // Return nothing if there are no pages.
-  if (empty($pages)) {
+  // Return nothing if there are no steps.
+  if (empty($steps)) {
     return array();
   }
 
-  // Set all the pages for this wizard.
+  // Set all the steps for this wizard.
   $forms = array();
-  foreach ($wizard['pageids'] as $page => $id ) {
-    $forms[$page] = array('form id' => $id);
-    $file = $wizard['wizard_path'] . '/' . $id . '.inc';
+  foreach ($wizard['step_ids'] as $step_id => $id ) {
+    $forms[$step_id] = array('form id' => $id);
+    $file = $wizard['wizard path'] . '/' . $id . '.inc';
     // @todo - this should only be checked when the for is created - wasting
     // cycles checking for files that are never loaded.
     if (file_exists(getcwd() . '/' . $file)) {
-      $forms[$page]['include'] = $file;
+      $forms[$step_id]['include'] = $file;
     }
   }
 
@@ -233,7 +237,7 @@ function wizard_helper_form($wizard, $step, $js, $form_state = array()) {
     'finish callback' => 'wizard_helper_finish',
     'return callback' => 'wizard_helper_finish',
     'cancel callback' => 'wizard_helper_cancel',
-    'order' => $pages,
+    'order' => $steps,
     'forms' => $forms
   );
 
@@ -256,8 +260,8 @@ function wizard_helper_form($wizard, $step, $js, $form_state = array()) {
 
   // If there is no step, then set it to the first item in the array.
   if (!$step) {
-    reset($pages);
-    $step = key($pages);
+    reset($steps);
+    $step = key($steps);
   }
 
   // Store the registration object in $_SESSION.
@@ -320,7 +324,7 @@ function wizard_helper_submit(&$form, &$form_state) {
     if ($next_page && $next_page !== $form_state['clicked_button']['#next']) {
 
       // See if this is in our pages array.
-      if (isset($wizard['pages'][$next_page])) {
+      if (isset($wizard['steps'][$next_page])) {
         $form_state['clicked_button']['#next'] = $next_page;
         $form_state['redirect'] = ctools_wizard_get_path($form_state['form_info'], $next_page);
       }
@@ -396,7 +400,7 @@ function wizard_helper_wizard($step = '', $js = '') {
     if ($next_page !== $step) {
 
       // See if this is in our pages array.
-      if (isset($wizard['pages'][$next_page])) {
+      if (isset($wizard['steps'][$next_page])) {
 
         // Go to this page.
         wizard_helper_goto($wizard, $next_page);
@@ -423,7 +427,7 @@ function wizard_helper_wizard($step = '', $js = '') {
     }
 
     // Make sure there are pages.
-    if (empty($wizard['pages'])) {
+    if (empty($wizard['steps'])) {
       drupal_not_found();
       return;
     }
