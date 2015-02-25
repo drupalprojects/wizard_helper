@@ -31,9 +31,9 @@ function wizard_helper_info() {
           $wizard['module'] = $module;
           $wizard['path'] = $path;
           $wizard['steps'] = isset($wizard['steps']) ? $wizard['steps'] : array();
-          $wizard['step_ids'] = isset($wizard['step_ids']) ? $wizard['step_ids'] : array();
           $wizard['id'] = isset($wizard['id']) ? $wizard['id'] : str_replace('/', '_', $path);
           $wizard['form id'] = isset($wizard['form id']) ? $wizard['form id'] : $wizard['module'] . '_' . $wizard['id'];
+          $wizard['step_ids'] = isset($wizard['step_ids']) ? $wizard['step_ids'] : array();
           $wizard['object name'] = isset($wizard['object name']) ? $wizard['object name'] : $wizard['form id'];
           $wizard['title'] = isset($wizard['title']) ? $wizard['title'] : '';
           $wizard['theme'] = isset($wizard['theme']) ? $wizard['theme'] : 'wizard_helper_page';
@@ -46,6 +46,9 @@ function wizard_helper_info() {
           $wizard['complete path'] = isset($wizard['complete path']) ? $wizard['complete path'] : $path;
           $wizard['cache type'] = isset($wizard['cache type']) ? $wizard['cache type'] : 'session';
           $wizard['context id'] = 0;
+
+          // Set the path to the module that is implementing the wizard.
+          $wizard['module path'] = drupal_get_path('module', $module);
 
           // Iterate though the pages and assign page ids.
           if (!empty($wizard['steps'])) {
@@ -110,14 +113,17 @@ function wizard_helper_theme() {
     // Get all the wizard helper page ids.
     foreach ($wizard['step_ids'] as $step_id => $id) {
 
+      // A potential template file if it was set.
+      $file = DRUPAL_ROOT . '/' . $wizard['module path'] . '/' . $id . '.tpl.php';
+
       // Add the template if the file exists.
-      if (file_exists(getcwd() . '/' . $wizard['wizard path'] . '/' . $id . '.tpl.php')) {
+      if (file_exists($file)) {
 
         // Add the template.
         $themes[$id] = array(
+          'render element' => 'form',
           'template'  => $id,
-          'path' => $wizard['wizard path'],
-          'arguments' => array('form' => NULL)
+          'path' => $wizard['module path'],
         );
       }
     }
